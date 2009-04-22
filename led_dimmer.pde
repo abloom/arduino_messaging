@@ -34,7 +34,6 @@ void setup() {
 
 void loop() {
   bool update_pin = false;
-  char msg[MESSAGE_SIZE];
   
   // Client client = server.available();
   // if (client.available() == MESSAGE_SIZE) { // message ready to be collected
@@ -47,24 +46,48 @@ void loop() {
   //   client.flush(); // clean garbage
   // }
   
-  if (Serial.available() == MESSAGE_SIZE) { // message ready to be collected
-    update_pin = true;
+  if (Serial.available() > 0) {
+    char input = Serial.read();
+    Serial.print("cmd: ");
+    Serial.println(input);
     
-    for(int i = 0; i < MESSAGE_SIZE; i++)
-      msg[i] = Serial.read();
-      
-  } else if (Serial.available() > MESSAGE_SIZE) {
-    Serial.flush(); // clean garbage
+    switch(input) {
+      case '1':
+        start_demo();
+        break;
+      case '2':
+        recieve_message();
+        break;
+      case '3':
+        nixie.clear(numDigits);
+        break;
+    }
+  }
+}
+
+void start_demo() {
+  for(int l = 0; l < 3; l++) {
+    for(int i = 0; i < 9; i++) {
+     nixie.writeNumLeft(i); 
+     delay(300);
+    }
   }
   
-  if (update_pin) {
-    int value = atoi(msg);
-    
-    Serial.print("Value: ");
-    Serial.println(value);
+  nixie.clear(numDigits);
+}
 
+void recieve_message() {    
+  char msg[MESSAGE_SIZE];
+  
+  for(int i = 0; i < MESSAGE_SIZE; i++)
+    msg[i] = Serial.read();
+
+  int value = atoi(msg);
+  
+  Serial.print("Value: ");
+  Serial.println(value);
+
+  nixie.writeNumLeft(value);
+  if (value == 0)
     nixie.writeNumLeft(value);
-    if (value == 0)
-      nixie.writeNumLeft(value);
-  }
 }
