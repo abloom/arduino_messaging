@@ -62,7 +62,6 @@ void loop() {
     
     Serial.print("Value: ");
     Serial.println(value);
-    Serial.println();
 
     nixie.writeNumLeft(value);
     if (value == 0)
