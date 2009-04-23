@@ -2,7 +2,7 @@
 #include <string.h>
 #include <Nixie.h>
 
-// message flags
+// message types
 #define NO_MESSAGE_ID '0'
 #define DEMO_ID '1'
 #define MESSAGE_ID '3'
@@ -72,16 +72,15 @@ void run_demo() {
   if (timer >= (demo_timer + DEMO_DELAY)) {
     demo_timer = timer;
 
-    // update the tubes
-    if (demo_direction < 0) {
+    if (demo_direction < 0) { // right justified
       nixie.writeNumTrim(demo_count, numDigits);
-    } else {
+    } else { // left justified with no shift
       nixie.clear(numDigits);
       nixie.writeNumLeft(demo_count);
     }
-    demo_count += demo_direction;     // increment the counter
     
-    // reverse the direction if we've hit 0 or 9
+    // reverse the direction if we've left the bounds (0-9)
+    demo_count += demo_direction;
     if ((demo_count >= 9) || (demo_count < 0))
       demo_direction *= -1;
   }
@@ -101,13 +100,13 @@ void recieve_message() {
   // convert and update the tubes
   int val = atoi(msg);
   switch (message_type) {
-    case ZERO_MESSAGE_ID:
+    case ZERO_MESSAGE_ID: // right justified with 0 padding
       nixie.writeNumZero(val, MESSAGE_SIZE);
       break;
-    case MESSAGE_ID:
+    case MESSAGE_ID: // right justified with blank padding
       nixie.writeNumTrim(val, MESSAGE_SIZE);
       break;
-    default:
+    default: // left justified (continue to shift)
       nixie.writeNumLeft(val);
       break;
   }
