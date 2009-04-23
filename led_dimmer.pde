@@ -6,10 +6,11 @@
 #define NO_MESSAGE_ID '0'
 #define DEMO_ID '1'
 #define MESSAGE_ID '3'
+#define ZERO_MESSAGE_ID '4'
 #define CLEAR_ID '2'
 
 #define MESSAGE_SIZE 2
-#define DEMO_DELAY 250
+#define DEMO_DELAY 175
 
 #define numDigits 2
 
@@ -18,10 +19,10 @@
 #define latchPin 4 // latch pin or RCK
 
 Nixie nixie(dataPin, clockPin, latchPin);
-char message_type = NO_MESSAGE_ID;
+char message_type = DEMO_ID;
 
-byte demo_count = 0;
-byte demo_direction = 1;
+int demo_count = 0;
+int demo_direction = 1;
 unsigned long demo_timer = 0;
 
 void setup() {
@@ -44,10 +45,11 @@ void loop() {
   switch(message_type) {
     case NO_MESSAGE_ID: // NOOP
       break;
-    case DEMO_ID: // keep the demo running
+    case DEMO_ID: // keep the demo running, no NOOP
       run_demo();
       break;
-    case MESSAGE_ID: // recieve a message and then NOOP
+    case ZERO_MESSAGE_ID: // recieve a message and then NOOP
+    case MESSAGE_ID: 
       recieve_message();
       message_type = NO_MESSAGE_ID;
       break;
@@ -70,11 +72,17 @@ void run_demo() {
   if (timer >= (demo_timer + DEMO_DELAY)) {
     demo_timer = timer;
 
-    nixie.writeNumLeft(demo_count);   // update the tubes
+    // update the tubes
+    if (demo_direction < 0) {
+      nixie.writeNumTrim(demo_count, numDigits);
+    } else {
+      nixie.clear(numDigits);
+      nixie.writeNumLeft(demo_count);
+    }
     demo_count += demo_direction;     // increment the counter
     
     // reverse the direction if we've hit 0 or 9
-    if ((demo_count >= 9) || (demo_count <= 0))
+    if ((demo_count >= 9) || (demo_count < 0))
       demo_direction *= -1;
   }
 }
@@ -82,15 +90,25 @@ void run_demo() {
 void recieve_message() {    
   char msg[MESSAGE_SIZE];
   
+  // sleep until the buffer is full
+  while (Serial.available() < MESSAGE_SIZE)
+    delay(10);
+    
+  // collect the message
   for(int i = 0; i < MESSAGE_SIZE; i++)
     msg[i] = Serial.read();
-
-  int value = atoi(msg);
-  
-  Serial.print("Value: ");
-  Serial.println(value);
-
-  nixie.writeNumLeft(value);
-  if (value == 0)
-    nixie.writeNumLeft(0);
+      
+  // convert and update the tubes
+  int val = atoi(msg);
+  switch (message_type) {
+    case ZERO_MESSAGE_ID:
+      nixie.writeNumZero(val, MESSAGE_SIZE);
+      break;
+    case MESSAGE_ID:
+      nixie.writeNumTrim(val, MESSAGE_SIZE);
+      break;
+    default:
+      nixie.writeNumLeft(val);
+      break;
+  }
 }
