@@ -13,6 +13,7 @@
 
 #define MESSAGE_SIZE 2
 #define DEMO_DELAY 175
+#define DEMO_DELAY_2 20
 
 #define numDigits 2
 
@@ -32,6 +33,10 @@ char message_type = DEMO_ID;
 int demo_count = 0;
 int demo_direction = 1;
 unsigned long demo_timer = 0;
+
+int demo_count_2 = 0;
+int demo_direction_2 = 1;
+unsigned long demo_timer_2 = 0;
 
 void setup() {  
   Serial.begin(9600);
@@ -81,6 +86,15 @@ void loop() {
 void run_demo() {
   unsigned long timer = millis();
   
+  if (timer >= (demo_timer_2 + DEMO_DELAY_2)) {
+    demo_timer_2 = timer;
+    barGraph.writeValue(1, demo_count_2);
+    
+    demo_count_2 += demo_direction_2;
+    if ((demo_count_2 >= 170) || (demo_count_2 < 1))
+      demo_direction_2 *= -1;
+  }
+  
   // only swap digits if weve waited 250ms
   if (timer >= (demo_timer + DEMO_DELAY)) {
     demo_timer = timer;
@@ -101,20 +115,21 @@ void run_demo() {
 
 void recieve_bargraph_message() {
   char msg[3];
-  char grph[1];
   int graph = 0;
   int value = 0;
   
   while (Serial.available() < 4)
     delay(10);
   
-  grph[0] = Serial.read();
-  graph = atoi(grph);
+  graph = Serial.read() - 48;
   
   for(int i = 0; i < 3; i++)
     msg[i] = Serial.read();
     
   value = atoi(msg);
+  Serial.print("Graph: ");
+  Serial.print(graph);
+  Serial.print(" value: ");
   Serial.println(value);
   barGraph.writeValue(graph, value);
 }
