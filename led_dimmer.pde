@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <Nixie.h>
+#include <BarGraph.h>
 
 // message types
 #define NO_MESSAGE_ID '0'
@@ -8,28 +9,36 @@
 #define MESSAGE_ID '3'
 #define ZERO_MESSAGE_ID '4'
 #define CLEAR_ID '2'
+#define BAR_GRAPH_ID '5'
 
 #define MESSAGE_SIZE 2
 #define DEMO_DELAY 175
 
 #define numDigits 2
 
-#define dataPin 2  // data line or SER
-#define clockPin 3 // clock pin or SCK
-#define latchPin 4 // latch pin or RCK
+#define nixieDataPin 2  // data line or SER
+#define nixieClockPin 3 // clock pin or SCK
+#define nixieLatchPin 4 // latch pin or RCK
 
-Nixie nixie(dataPin, clockPin, latchPin);
+#define barGraphDataPin 5  // data line or SER
+#define barGraphClockPin 6 // clock pin or SCK
+#define barGraphLatchPin 7 // latch pin or RCK
+
+Nixie nixie(nixieDataPin, nixieClockPin, nixieLatchPin);
+BarGraph barGraph(barGraphDataPin, barGraphClockPin, barGraphLatchPin);
+
 char message_type = DEMO_ID;
 
 int demo_count = 0;
 int demo_direction = 1;
 unsigned long demo_timer = 0;
 
-void setup() {
-  nixie.clear(numDigits);
-  
+void setup() {  
   Serial.begin(9600);
   Serial.println("ready");
+  
+  nixie.clear(numDigits);
+  barGraph.clear(1);
 }
 
 void loop() {  
@@ -55,6 +64,10 @@ void loop() {
       break;
     case CLEAR_ID: // clear the tubes and then NOOP
       nixie.clear(numDigits);
+      message_type = NO_MESSAGE_ID;
+      break;
+    case BAR_GRAPH_ID: // write a value to the bar graph
+      recieve_bargraph_message();
       message_type = NO_MESSAGE_ID;
       break;
     default: // report the error and then NOOP
@@ -84,6 +97,26 @@ void run_demo() {
     if ((demo_count >= 9) || (demo_count < 0))
       demo_direction *= -1;
   }
+}
+
+void recieve_bargraph_message() {
+  char msg[3];
+  char grph[1];
+  int graph = 0;
+  int value = 0;
+  
+  while (Serial.available() < 4)
+    delay(10);
+  
+  grph[0] = Serial.read();
+  graph = atoi(grph);
+  
+  for(int i = 0; i < 3; i++)
+    msg[i] = Serial.read();
+    
+  value = atoi(msg);
+  Serial.println(value);
+  barGraph.writeValue(graph, value);
 }
 
 void recieve_message() {    
