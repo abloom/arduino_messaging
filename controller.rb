@@ -61,12 +61,10 @@ Messages = [
     exit(0)
   end
   ]
-
-def print_main_message
-  Messages.each do |msg|
-    puts "#{msg.key}.) #{msg.name}"
-  end
-end  
+  
+def Messages.print_collection
+  each { |msg| puts "#{msg.key}.) #{msg.name}" }
+end
 
 def read_input(msg)
   printf msg
@@ -91,7 +89,7 @@ begin
   @sp = SerialPort.new(ARGV[0], :baud => 9600)
   
   loop do
-    print_main_message
+    Messages.print_collection
     
     input = read_input("Choice: ")
     msg = Messages.find{ |m| m.key == input || m.key.downcase == input }
