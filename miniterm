@@ -1,0 +1,25 @@
+#!/usr/bin/ruby
+
+require 'rubygems'
+require 'serialport'
+
+if ARGV.size < 1
+  STDERR.print "Usage: #{$0} port-path\n"
+  exit(1)
+end
+
+sp = SerialPort.new(ARGV[0].to_i, :baud => 9600)#, 8, 1, SerialPort::NONE)
+
+open("/dev/tty", "r+") { |tty|
+  tty.sync = true
+  Thread.new {
+    while true do
+      tty.printf("%c", sp.getc)
+    end
+  }
+  while (l = tty.gets) do
+    sp.write(l.sub("\n", "\r"))
+  end
+}
+
+sp.close
