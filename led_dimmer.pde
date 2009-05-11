@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <Nixie.h>
-#include <BarGraph.h>
+#include <MultiDAC.h>
 
 // message types
 #define NO_MESSAGE_ID '0'
@@ -26,7 +26,7 @@
 #define barGraphLatchPin 7 // latch pin or RCK
 
 Nixie nixie(nixieDataPin, nixieClockPin, nixieLatchPin);
-BarGraph barGraph(barGraphDataPin, barGraphClockPin, barGraphLatchPin);
+MultiDAC barGraph(barGraphDataPin, barGraphClockPin, barGraphLatchPin);
 
 char message_type = DEMO_ID;
 
