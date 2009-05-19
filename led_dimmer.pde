@@ -114,21 +114,25 @@ void run_demo() {
 }
 
 void recieve_bargraph_message() {
-  char msg[3];
+  char msg[2];
   int graph = 0;
+  int percent = 0;
   int value = 0;
   
-  while (Serial.available() < 4)
+  while (Serial.available() < 3)
     delay(10);
   
   graph = Serial.read() - 48;
   
-  for(int i = 0; i < 3; i++)
+  for(int i = 0; i < 2; i++)
     msg[i] = Serial.read();
     
-  value = atoi(msg);
+  percent = atoi(msg);
+  value = (int) (((float) percent / 99.0) * 254.0);
   Serial.print("Graph: ");
   Serial.print(graph);
+  Serial.print(" percent: ");
+  Serial.print(percent);
   Serial.print(" value: ");
   Serial.println(value);
   barGraph.writeValue(graph, value);
