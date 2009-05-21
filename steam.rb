@@ -52,8 +52,10 @@ def write_setup(setup, chosen_path)
   return setup
 end
 
-setup = load_setup_from_yaml
-arduino = setup ? Arduino.new(setup['serial_path']) : false
+if setup = load_setup_from_yaml
+  arduino = Arduino.new(setup['serial_path'])
+end
+  
 
 loop do
   choose do |menu|
@@ -62,34 +64,38 @@ loop do
     menu.prompt = "What would you like to do: "
     
     if arduino     
-      menu.choice(green("Demo Mode"), "Runs a simple demo") { arduino.send_message(:demo_mode) }
+      menu.choice(green("Demo Mode"), "Runs a simple demo") { arduino.demo_mode }
       
       menu.choice(green("Display Digits")) do
         msg = ask "Message: "
-        arduino.send_message(:display_digits, msg)
+        arduino.display_digits(msg)
       end
       
-      menu.choice(green("Clear Digits")) { arduino.send_message(:clear_digits) }
+      menu.choice(green("Clear Digits")) { arduino.clear_digits }
       
       menu.choice(green("Display Graph")) do
         graph = ask "Graph #: "
         value = ask "Value (0-100): "
-        arduino.send_message(:display_graph, graph, value)
+        arduino.display_graph(graph, value)
       end
       
       menu.choice(green("Clear Graph")) do
         graph = ask "Graph #: "
-        arduino.send_message(:clear_graph, graph)
+        arduino.clear_graph(graph)
       end
     end
     
     menu.choice(magenta("Setup")) do
       say "\n\n"
       setup = write_setup(setup, serial_port_menu)
+      arduino.disconnect! if arduino
       arduino = Arduino.new(setup['serial_path'])
     end
     
-    menu.choice(red("Quit")) { exit }
+    menu.choice(red("Quit")) do
+      arduino.disconnect! if arduino
+      exit
+    end
   end
   
   say "\n\n"

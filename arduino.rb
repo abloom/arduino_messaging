@@ -8,16 +8,7 @@ class Arduino
   def initialize(tty_path)
     @tty_path = tty_path
     logger.info "Arduino Init: #{@tty_path}"
-  end
-  
-  def send_message(message_type, *args)
     connect!
-    send(message_type, *args)
-    sleep(1)
-  rescue => e
-    logger.error e.message
-  ensure
-    disconnect!
   end
   
   def demo_mode
@@ -33,12 +24,18 @@ class Arduino
   end
   
   def display_graph(graph, msg)
-    value = (msg.to_f / 100.0) * 254.0
-    write(3, "#{graph}#{value.to_i}")
+    min, max = case graph
+    when '1' then [1, 170]
+    else [0, 254]
+    end
+      
+    value = (((msg.to_f / 100.0) * max) + min).to_i
+    value = value.to_s.rjust(3, '0');
+    write(3, "#{graph}#{value}")
   end
   
   def clear_graph(graph)
-    write(4, "#{graph}000")
+    write(4, graph)
   end
   
   def connect!
@@ -52,7 +49,7 @@ class Arduino
   end
   
   def write(m_type, m_body = "")
-    m_type = (m_type < 10 ? "0#{m_type}" : m_type.to_s)
+    m_type = m_type.to_s.rjust(2, '0')
     
     msg = "[#{m_type}#{m_body}]"
     logger.info "Sending: #{msg}"
