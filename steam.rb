@@ -56,7 +56,6 @@ if setup = load_setup_from_yaml
   arduino = Arduino.new(setup['serial_path'])
 end
   
-
 loop do
   choose do |menu|
     menu.header = "Available Arduino Operations"
