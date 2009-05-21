@@ -2,34 +2,12 @@
 #include <string.h>
 #include <Nixie.h>
 #include <MultiDAC.h>
+#include "messaging.h"
 
-// message types
-#define NO_MESSAGE_ID '0'
-#define DEMO_ID '1'
-#define MESSAGE_ID '3'
-#define ZERO_MESSAGE_ID '4'
-#define CLEAR_ID '2'
-#define BAR_GRAPH_ID '5'
+Nixie nixie(NIXIE_PIN_DATA, NIXIE_PIN_CLK, NIXIE_PIN_LATCH);
+MultiDAC barGraph(GRAPH_PIN_DATA, GRAPH_PIN_CLK, GRAPH_PIN_LATCH);
 
-#define MESSAGE_SIZE 2
-#define DEMO_DELAY 175
-#define DEMO_DELAY_2 20
-
-#define numDigits 2
-
-#define nixieDataPin 2  // data line or SER
-#define nixieClockPin 3 // clock pin or SCK
-#define nixieLatchPin 4 // latch pin or RCK
-
-#define barGraphDataPin 5  // data line or SER
-#define barGraphClockPin 6 // clock pin or SCK
-#define barGraphLatchPin 7 // latch pin or RCK
-
-Nixie nixie(nixieDataPin, nixieClockPin, nixieLatchPin);
-MultiDAC barGraph(barGraphDataPin, barGraphClockPin, barGraphLatchPin);
-
-char message_type = DEMO_ID;
-
+boolean demo_running = true;
 int demo_count = 0;
 int demo_direction = 1;
 unsigned long demo_timer = 0;
@@ -40,46 +18,159 @@ unsigned long demo_timer_2 = 0;
 
 void setup() {  
   Serial.begin(9600);
-  Serial.println("ready");
+  Serial.println("ready!");
   
-  nixie.clear(numDigits);
+  nixie.clear(NIXIE_NUM_DIGITS);
   barGraph.clear(1);
 }
 
-void loop() {  
-  if (Serial.available() > 0) {
-    // new message
-    message_type = Serial.read();
-    
-    Serial.print("cmd: ");
-    Serial.println(message_type);
+void print_err(int err) {
+  switch (err) {
+    case SERIAL_READ_OK:
+      Serial.println("The operation completed successfully");
+      break;
+      
+    case SERIAL_READ_ERR_FORMAT:
+      Serial.println("The message was improperly formatted or incomplete");
+      break;
+      
+    case SERIAL_READ_ERR_EMPTY:
+      Serial.println("No message was found");
+      break;
+      
+    default:
+      Serial.println("Invalid error id");
+      break;
+  }
+}
+
+/* Reads and stores a null-terminated message from the serial port
+ *
+ * Returns size of message, including null character
+ *
+ */ 
+int serial_read_message(char *msg) {
+  char read;
+  int read_len = -1, ret = SERIAL_READ_NONE;
+  boolean loop = true;
+  
+  if (Serial.available() >= 4) {
+    read = Serial.read();
+
+    while (read_len < SERIAL_MAX_MSG_LEN && loop) {
+      switch (read) {
+        case SERIAL_READ_START_CHAR:
+          read_len = 0;
+          break;
+
+        case SERIAL_READ_END_CHAR:
+          if (read_len > 0) {
+            ret = read_len;
+            loop = false;
+          } else {
+            ret = -SERIAL_READ_ERR_FORMAT;
+          }
+          break;
+
+        case SERIAL_READ_ERR_CHAR:
+          ret = -SERIAL_READ_ERR_EMPTY;
+          break;
+
+        default:
+          if (read_len < 0) {
+            ret = -SERIAL_READ_ERR_FORMAT;
+          } else {
+            msg[read_len++] = read;          
+          }
+          break;
+      }      
+      read = Serial.read();
+    }
   }
   
-  // process message
-  switch(message_type) {
-    case NO_MESSAGE_ID: // NOOP
-      break;
-    case DEMO_ID: // keep the demo running, no NOOP
+  return ret;
+}
+
+/* Using the last known message, fire off whatever action it requested */
+void process_message(char *msg) {
+  char type_s[3] = {0x00};
+  int type;
+  
+  memcpy(type_s, msg, 2);
+  type = atoi(type_s);
+  
+  demo_running = false;
+
+  switch(type)
+  {
+    case MSG_TYPE_DEMO:
+      Serial.println("demo");
+      demo_running = true;
       run_demo();
       break;
-    case ZERO_MESSAGE_ID: // recieve a message and then NOOP
-    case MESSAGE_ID: 
-      recieve_message();
-      message_type = NO_MESSAGE_ID;
+      
+    case MSG_TYPE_DISPLAY:
+      Serial.println("display");
+      display_nixie_message(&msg[2]);
       break;
-    case CLEAR_ID: // clear the tubes and then NOOP
-      nixie.clear(numDigits);
-      message_type = NO_MESSAGE_ID;
+      
+    case MSG_TYPE_CLEAR_DISPLAY:
+      Serial.println("clear display");
+      clear_nixies();
       break;
-    case BAR_GRAPH_ID: // write a value to the bar graph
-      recieve_bargraph_message();
-      message_type = NO_MESSAGE_ID;
+      
+    case MSG_TYPE_GRAPH:
+      Serial.println("graph");
+      display_bargraph_message(&msg[2]);
       break;
-    default: // report the error and then NOOP
-      Serial.print("unknown message_type: ");
-      Serial.println(message_type);
-      message_type = NO_MESSAGE_ID;
+      
+    case MSG_TYPE_CLEAR_GRAPH:
+      Serial.println("clear graph");
+      clear_bargraph(&msg[2]);
       break;
+  }
+}
+
+void display_nixie_message(char *msg) {
+  int output = atoi(msg);
+  nixie.writeNumZero(output, NIXIE_NUM_DIGITS);
+}
+
+void clear_nixies() {
+  nixie.clear(NIXIE_NUM_DIGITS);
+}
+
+void display_bargraph_message(char *msg) {
+  char graph_s[2] = {0x00}, value_s[4] = {0x00};
+  int graph, value;
+  
+  memcpy(graph_s, msg, 1);
+  memcpy(value_s, &msg[1], 3);
+  
+  graph = atoi(graph_s);
+  value = atoi(value_s);
+  
+  barGraph.writeValue(graph, value);
+}
+
+void clear_bargraph(char *msg) {
+  int graph = atoi(msg);
+  barGraph.writeValue(graph, 0);
+}
+
+void loop() {
+  char msg[SERIAL_MAX_MSG_LEN] = {0x00};
+  int ret;
+  
+  if (demo_running)
+    run_demo();
+  
+  ret = serial_read_message(msg);
+  
+  if (ret < 0) {
+    print_err(ret);
+  } else if (ret > 0) {
+    process_message(msg);
   }
 }
 
@@ -90,19 +181,19 @@ void run_demo() {
     demo_timer_2 = timer;
     barGraph.writeValue(1, demo_count_2);
     
+    // reverse the direction if we've hit the bounds
     demo_count_2 += demo_direction_2;
     if ((demo_count_2 >= 170) || (demo_count_2 < 1))
       demo_direction_2 *= -1;
   }
   
-  // only swap digits if weve waited 250ms
   if (timer >= (demo_timer + DEMO_DELAY)) {
     demo_timer = timer;
 
     if (demo_direction < 0) { // right justified
-      nixie.writeNumTrim(demo_count, numDigits);
+      nixie.writeNumTrim(demo_count, NIXIE_NUM_DIGITS);
     } else { // left justified with no shift
-      nixie.clear(numDigits);
+      nixie.clear(NIXIE_NUM_DIGITS);
       nixie.writeNumLeft(demo_count);
     }
     
@@ -110,56 +201,5 @@ void run_demo() {
     demo_count += demo_direction;
     if ((demo_count >= 9) || (demo_count < 0))
       demo_direction *= -1;
-  }
-}
-
-void recieve_bargraph_message() {
-  char msg[2];
-  int graph = 0;
-  int percent = 0;
-  int value = 0;
-  
-  while (Serial.available() < 3)
-    delay(10);
-  
-  graph = Serial.read() - 48;
-  
-  for(int i = 0; i < 2; i++)
-    msg[i] = Serial.read();
-    
-  percent = atoi(msg);
-  value = (int) (((float) percent / 99.0) * 254.0);
-  Serial.print("Graph: ");
-  Serial.print(graph);
-  Serial.print(" percent: ");
-  Serial.print(percent);
-  Serial.print(" value: ");
-  Serial.println(value);
-  barGraph.writeValue(graph, value);
-}
-
-void recieve_message() {    
-  char msg[MESSAGE_SIZE];
-  
-  // sleep until the buffer is full
-  while (Serial.available() < MESSAGE_SIZE)
-    delay(10);
-    
-  // collect the message
-  for(int i = 0; i < MESSAGE_SIZE; i++)
-    msg[i] = Serial.read();
-      
-  // convert and update the tubes
-  int val = atoi(msg);
-  switch (message_type) {
-    case ZERO_MESSAGE_ID: // right justified with 0 padding
-      nixie.writeNumZero(val, MESSAGE_SIZE);
-      break;
-    case MESSAGE_ID: // right justified with blank padding
-      nixie.writeNumTrim(val, MESSAGE_SIZE);
-      break;
-    default: // left justified (continue to shift)
-      nixie.writeNumLeft(val);
-      break;
   }
 }

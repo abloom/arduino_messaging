@@ -13,35 +13,32 @@ class Arduino
   def send_message(message_type, *args)
     connect!
     send(message_type, *args)
+    sleep(1)
   rescue => e
     logger.error e.message
   ensure
     disconnect!
   end
   
-  def display_digits(msg)
-    logger.info "Sending: 3#{msg}"
-    write("3#{msg}")
+  def demo_mode
+    write(0)
   end
   
-  def demo_mode
-    logger.info "Sending: 1"
-    write("1")
+  def display_digits(msg)
+    write(1, msg)
   end
   
   def clear_digits
-    logger.info "Sending: 2"
-    write("0")
+    write(2)
   end
   
   def display_graph(graph, msg)
-    logger.info "Sending: 5#{graph}#{msg}"
-    write("5#{graph}#{msg}")
+    value = (msg.to_f / 100.0) * 254.0
+    write(3, "#{graph}#{value.to_i}")
   end
   
   def clear_graph(graph)
-    logger.info "Sending: 5#{graph}00"
-    write("5#{graph}00")
+    write(4, "#{graph}000")
   end
   
   def connect!
@@ -54,7 +51,11 @@ class Arduino
     logger.info "Disconnected"
   end
   
-  def write(msg)
+  def write(m_type, m_body = "")
+    m_type = (m_type < 10 ? "0#{m_type}" : m_type.to_s)
+    
+    msg = "[#{m_type}#{m_body}]"
+    logger.info "Sending: #{msg}"
     @sp.write(msg)
   end
 end
